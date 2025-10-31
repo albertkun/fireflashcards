@@ -1,0 +1,5 @@
+body { font-family: system-ui, sans-serif; margin: 0; }
+#app { padding: 16px; max-width: 640px; }
+#languages > div { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+#addRow { display: flex; gap: 8px; margin: 10px 0; }
+button { padding: 6px 10px; }

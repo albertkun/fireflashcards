@@ -1,0 +1,50 @@
+{
+  "manifest_version": 2,
+  "name": "FireFlashcards",
+  "version": "1.0.0",
+  "description": "Spaced-repetition flashcards using Firefox Sync storage. Choose your target language (Japanese, Thai, Spanish, Korean, etc.).",
+  "applications": {
+    "gecko": {
+      "id": "fireflashcards@local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "icons": {
+    "96": "icons/icon-96.png"
+  },
+  "browser_action": {
+    "default_title": "FireFlashcards",
+    "default_icon": "icons/icon.svg",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "browser_style": true
+  },
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "tabs",
+    "activeTab"
+  ],
+  "commands": {
+    "open_popup": {
+      "suggested_key": { "default": "Alt+Shift+F", "mac": "Alt+Shift+F" },
+      "description": "Open FireFlashcards"
+    },
+    "quick_add": {
+      "suggested_key": { "default": "Alt+Shift+A", "mac": "Alt+Shift+A" },
+      "description": "Quick add selected text"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

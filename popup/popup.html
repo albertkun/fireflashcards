@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>FireFlashcards</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>FireFlashcards</h1>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="languageSelect"></select>
+          <button id="editToggle" title="Edit mode">✏️</button>
+          <button id="configBtn" title="Settings">⚙️</button>
+        </div>
+      </header>
+
+      <nav id="tabs">
+        <button data-tab="dashboard" class="active">Dashboard</button>
+        <button data-tab="add">Add</button>
+        <button data-tab="quiz">Quiz</button>
+        <button data-tab="list">List</button>
+      </nav>
+
+      <section id="view-dashboard" class="view">
+        <div class="card">
+          <div class="row"><strong>Progress</strong><span id="statTotal">0 words</span></div>
+          <div class="row"><span>Learned</span><span id="statLearned">0</span></div>
+          <div class="row"><span>Accuracy</span><span id="statAccuracy">0%</span></div>
+          <div class="row"><span>Streak</span><span id="statStreak">0 days</span></div>
+        </div>
+        <div class="card">
+          <div class="row"><strong>Daily goal</strong>
+            <span><input id="dailyGoalInput" type="number" min="1" step="1" style="width:64px" /></span>
+          </div>
+          <div class="progress"><div id="dailyGoalBar" class="progress-inner" style="width:0%"></div></div>
+          <div class="row"><small id="dailyGoalText">0/10 today</small><small id="dueCount">0 due</small></div>
+        </div>
+        <div class="card">
+          <div class="row" style="width:100%; justify-content:space-between; align-items:center;">
+            <strong>Study</strong>
+            <button id="startQuizBtn">Start Quiz</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row"><strong>Activity (last 28 days)</strong></div>
+          <div id="heatmap" class="heatmap"></div>
+        </div>
+      </section>
+
+      <section id="view-add" class="view hidden">
+        <div id="add">
+          <input id="word" placeholder="Word" />
+          <input id="translation" placeholder="Translation" />
+          <input id="pronunciation" placeholder="Pronunciation (optional)" />
+          <input id="reference" placeholder="Reference URL (optional)" />
+          <button id="addBtn">Add</button>
+        </div>
+      </section>
+
+      <section id="view-quiz" class="view hidden">
+        <div id="ankiCard" class="card">
+          <div class="row"><div id="ankiWord">—</div></div>
+          <div id="ankiAnswer" class="anki-answer hidden">—</div>
+          <a id="ankiRefLink" class="anki-answer hidden" href="#" target="_blank" rel="noreferrer">Open reference</a>
+          <div class="row">
+            <button id="ankiReveal">Reveal</button>
+            <span style="flex:1"></span>
+            <button id="ankiGood">Good</button>
+            <button id="ankiAgain">Again</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-list" class="view hidden">
+        <div id="list"></div>
+      </section>
+
+      <div id="configModal" class="modal hidden">
+        <div class="modal-card">
+          <div class="row"><strong>Settings</strong><button id="configClose" title="Close">✖</button></div>
+          <div class="card">
+            <div class="row"><strong>Languages</strong><input id="langSearch" placeholder="Search languages" style="flex:1; margin-left:8px"/></div>
+            <div id="langToggles" style="display:grid; gap:6px; margin-top:8px"></div>
+          </div>
+          <div class="card">
+            <div class="row"><strong>Theme</strong>
+              <select id="themeSelect">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="system">System</option>
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row"><strong>Data</strong></div>
+            <div class="row" style="gap:6px; justify-content:flex-start">
+              <button id="exportWordsCsv2">Export Words CSV</button>
+              <button id="exportActivityCsv2">Export Activity CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

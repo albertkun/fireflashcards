@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>FireFlashcards Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div id="app">
+      <h1>Languages</h1>
+      <div id="languages"></div>
+      <div id="addRow">
+        <input id="newLangId" placeholder="id (e.g., spanish)" />
+        <input id="newLangLabel" placeholder="Label (e.g., Spanish)" />
+        <button id="addLang">Add language</button>
+      </div>
+      <hr />
+      <h2>Data</h2>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <button id="exportWordsCsv">Export Words CSV</button>
+        <button id="exportActivityCsv">Export Activity CSV</button>
+        <button id="exportBtn">Export JSON</button>
+        <input type="file" id="importFile" accept="application/json" />
+        <button id="importBtn">Import JSON</button>
+      </div>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

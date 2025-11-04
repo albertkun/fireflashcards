@@ -46,7 +46,7 @@ fi
 NAME_SLUG=$(printf '%s' "${NAME_RAW:-extension}" \
   | tr '[:upper:]' '[:lower:]' \
   | tr -cs 'a-z0-9' '-' \
-  | sed -e 's/^-\+//' -e 's/-\+$//')
+  | sed -e 's/^\-\+//' -e 's/\-\+$//')
 [[ -z "$NAME_SLUG" ]] && NAME_SLUG="fireflashcards"
 
 ARTIFACT_BASE="$NAME_SLUG"
@@ -68,11 +68,12 @@ cp manifest.json "$STAGE_DIR/"
 # Attempt to ensure required icons exist; try to generate if missing
 STRICT_ICON_CHECK=${STRICT_ICON_CHECK:-0}
 need_48=0; need_96=0
-[[ ! -f icons/icon-48.png ]] && need_48=1
-[[ ! -f icons/icon-96.png ]] && need_96=1
+# treat zero-byte as missing
+if [[ ! -s icons/icon-48.png ]]; then need_48=1; fi
+if [[ ! -s icons/icon-96.png ]]; then need_96=1; fi
 
 if (( need_48 == 1 || need_96 == 1 )); then
-  echo "Info: PNG icons missing; attempting to generate from icons/icon.svg (if tools available)..."
+  echo "Info: PNG icons missing or empty; attempting to generate from icons/icon.svg (if tools available)..."
   if [[ -f icons/icon.svg ]]; then
     if have_cmd inkscape; then
       (( need_48 == 1 )) && inkscape icons/icon.svg -o icons/icon-48.png -w 48 -h 48 || true
@@ -88,10 +89,10 @@ if (( need_48 == 1 || need_96 == 1 )); then
   fi
 fi
 
-# Re-evaluate presence after attempted generation
-if [[ ! -f icons/icon-48.png || ! -f icons/icon-96.png ]]; then
+# Re-evaluate presence after attempted generation (non-zero size)
+if [[ ! -s icons/icon-48.png || ! -s icons/icon-96.png ]]; then
   if [[ "$STRICT_ICON_CHECK" == "1" ]]; then
-    echo "Error: Missing icons PNGs and STRICT_ICON_CHECK=1 set. Aborting." >&2
+    echo "Error: Missing icons PNGs (or zero-byte) and STRICT_ICON_CHECK=1 set. Aborting." >&2
     exit 3
   else
     echo "Warning: PNG icons still missing. The add-on will build but icons may not display correctly." >&2

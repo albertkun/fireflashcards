@@ -7,7 +7,19 @@ const SYNC_KEYS = {
   STUDY_LISTS: 'study-lists',
 };
 
-function makeId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+// UUID v4 generator (crypto if available, fallback to Math.random)
+function uuidv4(){
+  try{
+    const buf = new Uint8Array(16);
+    (self.crypto || crypto).getRandomValues(buf);
+    buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+    buf[8] = (buf[8] & 0x3f) | 0x80; // variant 10
+    const hex = [...buf].map(b=>b.toString(16).padStart(2,'0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }catch{
+    return (Date.now().toString(36)+Math.random().toString(36).slice(2)).replace(/\./g,'');
+  }
+}
 
 async function getSync(key) {
   const res = await browser.storage.sync.get(key);
@@ -17,15 +29,74 @@ async function setSync(key, value) {
   await browser.storage.sync.set({ [key]: value });
 }
 
+function normText(s){
+  const t = (s||'')
+    .replace(/[\u3000\u00A0]/g, ' ') // full-width/nbsp to space
+    .trim()
+    .replace(/\s+/g,' ');
+  try { return t.normalize('NFKC').toLowerCase(); } catch { return t.toLowerCase(); }
+}
+
+const recentAdds = new Map(); // sig -> timestamp
+function shouldThrottle(sig, ms=1500){
+  const now = Date.now();
+  // cleanup
+  for (const [k,t] of [...recentAdds]){ if (now - t > ms) recentAdds.delete(k); }
+  const t = recentAdds.get(sig);
+  if (t && now - t < ms) return true;
+  recentAdds.set(sig, now);
+  return false;
+}
+
+// Stronger duplicate protection
+const inflightAdds = new Set(); // sigs being processed
+async function isRecentDuplicate(lang, rawWord, windowMs=2000){
+  try{
+    const words = (await getSync(SYNC_KEYS.WORDS)) || [];
+    const norm = normText(rawWord);
+    const now = Date.now();
+    // Scan most recent 20 items only for speed
+    for (let i = words.length - 1, seen=0; i >= 0 && seen < 20; i--, seen++){
+      const w = words[i];
+      if (!w) continue;
+      if (w.language === lang && normText(w.word) === norm){
+        const t = new Date(w.createdAt||0).getTime();
+        if (isFinite(t) && (now - t) < windowMs) return true;
+      }
+    }
+  }catch{}
+  return false;
+}
+
 async function migrateWordsEnsureIds(){
   const words = (await getSync(SYNC_KEYS.WORDS)) || [];
   let changed = false;
   const seen = new Set();
+  const splitMap = new Map(); // oldId => [newIds]
   for (const w of words){
-    if (!w.id || seen.has(w.id)) { w.id = makeId(); changed = true; }
+    if (!w.id){ w.id = uuidv4(); changed = true; }
+    if (seen.has(w.id)){
+      const oldId = w.id;
+      const newId = uuidv4();
+      w.id = newId; changed = true;
+      const arr = splitMap.get(oldId) || [];
+      arr.push(newId); splitMap.set(oldId, arr);
+    }
     seen.add(w.id);
   }
-  if (changed) await setSync(SYNC_KEYS.WORDS, words);
+  if (changed){
+    await setSync(SYNC_KEYS.WORDS, words);
+    // If we split any ids, include new ids in lists that referenced the old id
+    if (splitMap.size){
+      const lists = (await getSync(SYNC_KEYS.STUDY_LISTS)) || [];
+      for (const l of lists){
+        const ids = new Set(l.wordIds || []);
+        for (const [oldId, newIds] of splitMap){ if (ids.has(oldId)) newIds.forEach(id=>ids.add(id)); }
+        l.wordIds = Array.from(ids);
+      }
+      await setSync(SYNC_KEYS.STUDY_LISTS, lists);
+    }
+  }
 }
 
 function setDynamicIcon() {
@@ -67,7 +138,6 @@ async function ensureDefaultList(language) {
 async function addEntryFromSelection(selection, tab, promptTranslation) {
   const settings = await getSync(SYNC_KEYS.SETTINGS) || { activeLanguage: 'japanese' };
   await migrateWordsEnsureIds();
-  const words = await getSync(SYNC_KEYS.WORDS) || [];
   let translation = '';
   if (promptTranslation) {
     try {
@@ -75,32 +145,48 @@ async function addEntryFromSelection(selection, tab, promptTranslation) {
       translation = res?.translation || '';
     } catch {}
   }
-  const entry = {
-    id: makeId(), word: selection, translation,
-    language: settings.activeLanguage || 'japanese', difficulty: 3,
-    reviewCount: 0, correctCount: 0, createdAt: new Date().toISOString(),
-  };
-  const next = [...words, entry];
-  await setSync(SYNC_KEYS.WORDS, next);
+  const lang = settings.activeLanguage || 'japanese';
+  const sig = `${lang}|${normText(selection)}`;
+  // triple guard: in-flight, throttle, and recent duplicate window
+  if (inflightAdds.has(sig)) return;
+  if (shouldThrottle(sig)) return;
+  if (await isRecentDuplicate(lang, selection)) return;
+  inflightAdds.add(sig);
+  try{
+    const words = (await getSync(SYNC_KEYS.WORDS)) || [];
+    // Always create a new entry with its own UUID
+    const entry = {
+      id: uuidv4(), word: selection, translation,
+      language: lang, difficulty: 3,
+      reviewCount: 0, correctCount: 0, createdAt: new Date().toISOString(),
+    };
+    const next = [...words, entry];
+    await setSync(SYNC_KEYS.WORDS, next);
 
-  // Add to default list
-  const list = await ensureDefaultList(entry.language);
-  const lists = (await getSync(SYNC_KEYS.STUDY_LISTS)) || [];
-  const idx = lists.findIndex(l => l.id === list.id);
-  if (idx >= 0 && !lists[idx].wordIds?.includes(entry.id)) {
-    lists[idx].wordIds = [...(lists[idx].wordIds || []), entry.id];
-    await setSync(SYNC_KEYS.STUDY_LISTS, lists);
+    // Add to default list (unique per id)
+    const list = await ensureDefaultList(lang);
+    const lists = (await getSync(SYNC_KEYS.STUDY_LISTS)) || [];
+    const idx = lists.findIndex(l => l.id === list.id);
+    if (idx >= 0) {
+      const ids = new Set(lists[idx].wordIds || []);
+      ids.add(entry.id);
+      lists[idx].wordIds = Array.from(ids);
+      await setSync(SYNC_KEYS.STUDY_LISTS, lists);
+    }
+
+    try {
+      browser.browserAction.setBadgeText({ text: '+1', tabId: tab?.id });
+      setTimeout(() => browser.browserAction.setBadgeText({ text: '', tabId: tab?.id }), 1500);
+    } catch {}
+  } finally {
+    // small delay before allowing same sig again
+    setTimeout(()=> inflightAdds.delete(sig), 1200);
   }
-
-  try {
-    browser.browserAction.setBadgeText({ text: '+1', tabId: tab?.id });
-    setTimeout(() => browser.browserAction.setBadgeText({ text: '', tabId: tab?.id }), 1500);
-  } catch {}
 }
 
 browser.runtime.onInstalled.addListener(async () => {
   try { await browser.contextMenus.removeAll(); } catch {}
-  browser.contextMenus.create({ id: 'quick-add-word', title: 'Add to FireFlashcards…', contexts: ['selection'] });
+  try { browser.contextMenus.create({ id: 'quick-add-word', title: 'Add to FireFlashcards…', contexts: ['selection'] }); } catch {}
   await migrateWordsEnsureIds();
   setDynamicIcon();
 });
@@ -108,9 +194,12 @@ browser.runtime.onInstalled.addListener(async () => {
 browser.runtime.onStartup.addListener(async () => { await migrateWordsEnsureIds(); setDynamicIcon(); });
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
-  const selection = info.selectionText?.trim();
-  if (!selection) return;
-  await addEntryFromSelection(selection, tab, true);
+  try{
+    if (info.menuItemId !== 'quick-add-word') return; // guard other menu items
+    const selection = info.selectionText?.trim();
+    if (!selection) return;
+    await addEntryFromSelection(selection, tab, true);
+  }catch{}
 });
 
 browser.commands.onCommand.addListener(async (command) => {
@@ -130,12 +219,9 @@ browser.commands.onCommand.addListener(async (command) => {
 });
 
 browser.runtime.onMessage.addListener(async (msg) => {
-  if (msg?.type === 'getWords') {
-    const w = await getSync(SYNC_KEYS.WORDS) || [];
-    return { ok: true, words: w };
-  }
-  if (msg?.type === 'setWords') {
-    await setSync(SYNC_KEYS.WORDS, msg.words || []);
-    return { ok: true };
-  }
+  try {
+    if (msg.type === 'refresh_badge') {
+      setDynamicIcon();
+    }
+  } catch {}
 });

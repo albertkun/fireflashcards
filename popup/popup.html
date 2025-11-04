@@ -2,36 +2,42 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>FireFlashcards</title>
+    <title data-i18n="app.title">FireFlashcards</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <div id="app">
       <header>
-        <h1>FireFlashcards</h1>
+        <h1 id="appTitle" data-i18n="app.title">FireFlashcards</h1>
         <div style="display:flex; gap:8px; align-items:center;">
-          <select id="languageSelect"></select>
-          <button id="editToggle" title="Edit mode">✏️</button>
-          <button id="configBtn" title="Settings">⚙️</button>
+          <!-- Settings moved into modal -->
+          <select id="quickLangSwitch" title="Target language" style="padding:4px 6px; font-size:13px;">
+            <option value="japanese">🇯🇵 Japanese</option>
+            <option value="thai">🇹🇭 Thai</option>
+            <option value="spanish">🇪🇸 Spanish</option>
+            <option value="korean">🇰🇷 Korean</option>
+          </select>
+          <button id="editToggle" title="Edit mode" data-i18n="header.edit">✏️</button>
+          <button id="configBtn" title="Settings" data-i18n="header.settings">⚙️</button>
         </div>
       </header>
 
       <nav id="tabs">
-        <button data-tab="dashboard" class="active">Dashboard</button>
-        <button data-tab="add">Add</button>
-        <button data-tab="quiz">Quiz</button>
-        <button data-tab="list">List</button>
+        <button data-tab="dashboard" class="active" data-i18n="tabs.dashboard">Dashboard</button>
+        <button data-tab="add" data-i18n="tabs.add">Add</button>
+        <button data-tab="quiz" data-i18n="tabs.quiz">Quiz</button>
+        <button data-tab="list" data-i18n="tabs.list">List</button>
       </nav>
 
       <section id="view-dashboard" class="view">
         <div class="card">
-          <div class="row"><strong>Progress</strong><span id="statTotal">0 words</span></div>
-          <div class="row"><span>Learned</span><span id="statLearned">0</span></div>
-          <div class="row"><span>Accuracy</span><span id="statAccuracy">0%</span></div>
-          <div class="row"><span>Streak</span><span id="statStreak">0 days</span></div>
+          <div class="row"><strong data-i18n="dashboard.progress">Progress</strong><span id="statTotal">0 words</span></div>
+          <div class="row"><span data-i18n="dashboard.learned">Learned</span><span id="statLearned">0</span></div>
+          <div class="row"><span data-i18n="dashboard.accuracy">Accuracy</span><span id="statAccuracy">0%</span></div>
+          <div class="row"><span data-i18n="dashboard.streak">Streak</span><span id="statStreak">0 <span data-i18n="dashboard.days">days</span></span></div>
         </div>
         <div class="card">
-          <div class="row"><strong>Daily goal</strong>
+          <div class="row"><strong data-i18n="dashboard.dailyGoal">Daily goal</strong>
             <span><input id="dailyGoalInput" type="number" min="1" step="1" style="width:64px" /></span>
           </div>
           <div class="progress"><div id="dailyGoalBar" class="progress-inner" style="width:0%"></div></div>
@@ -39,70 +45,93 @@
         </div>
         <div class="card">
           <div class="row" style="width:100%; justify-content:space-between; align-items:center;">
-            <strong>Study</strong>
-            <button id="startQuizBtn">Start Quiz</button>
+            <strong data-i18n="dashboard.study">Study</strong>
+            <button id="startQuizBtn" data-i18n="dashboard.startQuiz">Start Quiz</button>
           </div>
         </div>
         <div class="card">
-          <div class="row"><strong>Activity (last 28 days)</strong></div>
+          <div class="row"><strong data-i18n="dashboard.activity">Activity (last 28 days)</strong></div>
           <div id="heatmap" class="heatmap"></div>
+        </div>
+        <div class="card">
+          <div class="row"><strong data-i18n="dashboard.recentSessions">Recent Study Sessions</strong></div>
+          <div id="recentSessions" class="session-list"></div>
         </div>
       </section>
 
       <section id="view-add" class="view hidden">
         <div id="add">
-          <input id="word" placeholder="Word" />
-          <input id="translation" placeholder="Translation" />
-          <input id="pronunciation" placeholder="Pronunciation (optional)" />
+          <input id="word" placeholder="Word" data-i18n="add.word" />
+          <input id="translation" placeholder="Translation" data-i18n="add.translation" />
+          <input id="pronunciation" placeholder="Pronunciation (optional)" data-i18n="add.pronunciation" />
           <input id="reference" placeholder="Reference URL (optional)" />
-          <button id="addBtn">Add</button>
+          <input id="hint" placeholder="Hint / mnemonic (optional)" />
+          <button id="addBtn" data-i18n="add.addButton">Add</button>
         </div>
       </section>
 
       <section id="view-quiz" class="view hidden">
+        <div class="row" style="justify-content:space-between; gap:8px; margin-bottom:6px; align-items:flex-start;">
+          <label style="display:flex; align-items:center; gap:6px;">
+            <span data-i18n="quiz.studyList">List</span>
+            <select id="studyListFilter" style="max-width: 200px;"></select>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="missedTodayOnly" />
+            <span data-i18n="quiz.missedTodayOnly">Missed today only</span>
+          </label>
+        </div>
         <div id="ankiCard" class="card">
-          <div class="row"><div id="ankiWord">—</div></div>
-          <div id="ankiAnswer" class="anki-answer hidden">—</div>
-          <a id="ankiRefLink" class="anki-answer hidden" href="#" target="_blank" rel="noreferrer">Open reference</a>
-          <div class="row">
-            <button id="ankiReveal">Reveal</button>
-            <span style="flex:1"></span>
-            <button id="ankiGood">Good</button>
-            <button id="ankiAgain">Again</button>
+          <div id="ankiWord" style="font-size:16px; font-weight:600;"></div>
+          <div id="ankiAnswer" class="anki-answer hidden"></div>
+          <a id="ankiRefLink" class="hidden" href="#" target="_blank" rel="noreferrer" style="font-size:12px" data-i18n="list.reference">Reference</a>
+          <div id="ankiHint" class="anki-answer hidden"></div>
+          <div class="row" style="justify-content:flex-end; gap:6px; margin-top:8px;">
+            <button id="ankiReveal" data-i18n="quiz.reveal">Reveal</button>
+            <button id="ankiAgain" data-i18n="quiz.again">Again</button>
+            <button id="ankiGood" data-i18n="quiz.good">Good</button>
+            <button id="restartQuizBtn" class="hidden" data-i18n="quiz.restart" title="Restart quiz">↻</button>
           </div>
         </div>
+        <div class="tip" id="quizTip" data-i18n="quiz.tip">Try to recall the translation before flipping the card</div>
       </section>
 
       <section id="view-list" class="view hidden">
+        <div id="listsManager" class="card"></div>
         <div id="list"></div>
       </section>
 
       <div id="configModal" class="modal hidden">
         <div class="modal-card">
-          <div class="row"><strong>Settings</strong><button id="configClose" title="Close">✖</button></div>
-          <div class="card">
-            <div class="row"><strong>Languages</strong><input id="langSearch" placeholder="Search languages" style="flex:1; margin-left:8px"/></div>
-            <div id="langToggles" style="display:grid; gap:6px; margin-top:8px"></div>
+          <div class="row" style="align-items:center; justify-content:space-between;">
+            <strong data-i18n="settings.title">Settings</strong>
+            <button id="configClose" class="linklike" aria-label="Close">✕</button>
           </div>
-          <div class="card">
-            <div class="row"><strong>Theme</strong>
+          <div class="config-grid">
+            <label>
+              <span data-i18n="settings.theme">Theme</span>
               <select id="themeSelect">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="system">System</option>
+                <option value="system" data-i18n="settings.theme.system">System</option>
+                <option value="light" data-i18n="settings.theme.light">Light</option>
+                <option value="dark" data-i18n="settings.theme.dark">Dark</option>
               </select>
-            </div>
+            </label>
+            <label>
+              <span data-i18n="settings.appLanguage">App language</span>
+              <select id="appLangSelect"></select>
+            </label>
+            <label>
+              <span data-i18n="settings.targetLanguage">Target language</span>
+              <select id="languageSelect"></select>
+            </label>
           </div>
-          <div class="card">
-            <div class="row"><strong>Data</strong></div>
-            <div class="row" style="gap:6px; justify-content:flex-start">
-              <button id="exportWordsCsv2">Export Words CSV</button>
-              <button id="exportActivityCsv2">Export Activity CSV</button>
-            </div>
+          <div class="row" style="justify-content:flex-end; margin-top:8px;">
+            <button id="resetAllBtn">Reset all data</button>
           </div>
         </div>
       </div>
     </div>
+    <script src="../scripts/i18n.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
